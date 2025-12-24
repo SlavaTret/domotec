@@ -9,7 +9,7 @@
   <meta property="og:type" content="website">
   <meta property="og:title" content="DOMOTEC Air Fryer – зі знижкою">
   <meta property="og:description" content="Дві моделі DOMOTEC Air Fryer: 7 л та 7.6 л. Смачне хрумке без зайвої олії.">
-  <meta property="og:image" content="https://slavatret.github.io/n8n/download.png">
+  <meta property="og:image" content="http://domotec.pp.ua/ms-3225-3226.png">
 
   <style>
     :root {
@@ -722,7 +722,7 @@
               <small id="ukrCityHint" style="color:var(--muted);font-size:11px;">Введіть мінімум 2 літери.</small>
             </div>
             <div class="autocomplete-wrapper">
-              <input type="text" id="ukrOffice" placeholder="Відділення: номер або адреса" autocomplete="off" disabled>
+              <input type="text" id="ukrOffice" placeholder="Відділення: індекс або адреса" autocomplete="off" disabled>
               <div id="ukrOfficeList" class="autocomplete-list"></div>
             </div>
           </div>
@@ -1054,7 +1054,10 @@
     try {
       const res = await fetch(`https://www.ukrposhta.ua/address-classifier-ws/get_city_by_region_id_and_district_id_and_city_ua?city_ua=${encodeURIComponent(query)}`);
       const data = await res.json();
-      return data.Entries || [];
+      if (data.Entries && data.Entries.Entry) {
+        return Array.isArray(data.Entries.Entry) ? data.Entries.Entry : [data.Entries.Entry];
+      }
+      return [];
     } catch (e) {
       console.error(e);
       return [];
@@ -1063,9 +1066,12 @@
 
   async function loadUkrOffices(cityId) {
     try {
-      const res = await fetch(`https://www.ukrposhta.ua/address-classifier-ws/get_postoffices_by_city_id?city_id=${cityId}`);
+      const res = await fetch(`https://www.ukrposhta.ua/address-classifier-ws/get_postoffices_by_postcode_cityid_cityvpzid?city_id=${cityId}`);
       const data = await res.json();
-      return data.Entries || [];
+      if (data.Entries && data.Entries.Entry) {
+        return Array.isArray(data.Entries.Entry) ? data.Entries.Entry : [data.Entries.Entry];
+      }
+      return [];
     } catch (e) {
       console.error(e);
       return [];
@@ -1115,8 +1121,11 @@
     }
     const q = filterText.toLowerCase();
     const filtered = ukrOfficeOptions.filter(o => {
-      const name = `${o.POSTCODE} ${o.STREET_UA_VPZ || ''} ${o.HOUSENUMBER_UA || ''}`.toLowerCase();
-      return name.includes(q);
+      const postcode = o.POSTCODE || '';
+      const street = o.STREET_UA_VPZ || '';
+      const house = o.HOUSENUMBER_UA || '';
+      const fullText = `${postcode} ${street} ${house}`.toLowerCase();
+      return fullText.includes(q);
     }).slice(0, 40);
 
     if (!filtered.length) {
@@ -1128,9 +1137,12 @@
     filtered.forEach(o => {
       const item = document.createElement('div');
       item.className = 'autocomplete-item';
-      item.textContent = `${o.POSTCODE} — ${o.STREET_UA_VPZ || ''} ${o.HOUSENUMBER_UA || ''}`.trim();
+      const postcode = o.POSTCODE || '';
+      const street = o.STREET_UA_VPZ || '';
+      const house = o.HOUSENUMBER_UA || '';
+      item.textContent = `${postcode} — ${street} ${house}`.trim();
       item.addEventListener('click', () => {
-        ukrOfficeInput.value = `${o.POSTCODE} — ${o.STREET_UA_VPZ || ''} ${o.HOUSENUMBER_UA || ''}`.trim();
+        ukrOfficeInput.value = `${postcode} — ${street} ${house}`.trim();
         hideList(ukrOfficeList);
       });
       ukrOfficeList.appendChild(item);
