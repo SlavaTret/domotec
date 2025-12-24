@@ -805,6 +805,21 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   const npBlock = document.getElementById('npBlock');
   const ukrBlock = document.getElementById('ukrBlock');
 
+  // ====== GOOGLE ADS CONVERSION FUNCTION ======
+  function gtag_report_conversion(url) {
+    var callback = function () {
+      if (typeof(url) != 'undefined') {
+        window.location = url;
+      }
+    };
+    gtag('event', 'conversion', {
+        'send_to': 'AW-17711054529/HLS7CMHryNYbEMH9pP1B',
+        'transaction_id': '',
+        'event_callback': callback
+    });
+    return false;
+  }
+
   function openOrderModal(prefillModel) {
     if (prefillModel && modelSelect) modelSelect.value = prefillModel;
     orderModal.style.display = 'flex';
@@ -860,6 +875,9 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     btn.addEventListener('click', () => {
       const m = btn.getAttribute('data-model');
       openOrderModal(m);
+      
+      // ✅ ВІДСТЕЖЕННЯ КЛІКУ НА КНОПКУ "ЗАМОВИТИ"
+      gtag_report_conversion();
     });
   });
   closeOrderBtns.forEach(btn => btn.addEventListener('click', closeOrderModal));
@@ -1090,7 +1108,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       deliveryCity = npCityInput ? npCityInput.value.trim() || null : null;
       deliveryWarehouseOrAddress = npWarehouseInput ? npWarehouseInput.value.trim() || null : null;
     } else {
-      // Укрпошта: місто, індекс, адреса
       const ukrCity = document.getElementById('ukrCity').value.trim();
       const ukrIndex = document.getElementById('ukrIndex').value.trim();
       const ukrAddress = document.getElementById('ukrAddress').value.trim();
@@ -1121,6 +1138,16 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       });
       if (!res.ok) throw new Error('Network error');
 
+      // Відправка події в dataLayer для GTM
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        'event': 'form_submit',
+        'form_name': 'lead_form',
+        'model': modelSelect.value || 'not_selected',
+        'delivery_method': deliveryMethod,
+        'payment_method': paymentMethod
+      });
+
       formStatus.textContent = 'Дякуємо! Ми скоро з вами звʼяжемося.';
       formStatus.classList.add('success');
       leadForm.reset();
@@ -1132,6 +1159,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       if (npWarehouseInput) npWarehouseInput.disabled = true;
       hideList(npCityList);
       hideList(npWarehouseList);
+
     } catch (err) {
       console.error(err);
       formStatus.textContent = 'Помилка при відправці. Спробуйте ще раз.';
