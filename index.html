@@ -712,19 +712,19 @@
           </div>
         </div>
 
-        <!-- Блок Укрпошти -->
-        <div class="form-group" id="ukrBlock" style="display:none;">
-          <label>Доставка Укрпоштою</label>
-          <div class="delivery-row">
-            <div class="autocomplete-wrapper">
-              <input type="text" id="ukrCity" placeholder="Місто (почніть вводити)" autocomplete="off">
-              <div id="ukrCityList" class="autocomplete-list"></div>
-              <small id="ukrCityHint" style="color:var(--muted);font-size:11px;">Введіть мінімум 2 літери.</small>
-            </div>
-            <div class="autocomplete-wrapper">
-              <input type="text" id="ukrOffice" placeholder="Відділення: індекс або адреса" autocomplete="off" disabled>
-              <div id="ukrOfficeList" class="autocomplete-list"></div>
-            </div>
+        <!-- Блок Укрпошти (прості поля) -->
+        <div id="ukrBlock" style="display:none;">
+          <div class="form-group">
+            <label for="ukrCity">Місто *</label>
+            <input type="text" id="ukrCity" name="ukrCity" placeholder="Наприклад, Київ">
+          </div>
+          <div class="form-group">
+            <label for="ukrIndex">Індекс відділення *</label>
+            <input type="text" id="ukrIndex" name="ukrIndex" placeholder="Наприклад, 01001">
+          </div>
+          <div class="form-group">
+            <label for="ukrAddress">Адреса відділення *</label>
+            <input type="text" id="ukrAddress" name="ukrAddress" placeholder="Наприклад, вул. Хрещатик, 22">
           </div>
         </div>
 
@@ -786,7 +786,6 @@
   const deliveryMethodSelect = document.getElementById('deliveryMethod');
   const npBlock = document.getElementById('npBlock');
   const ukrBlock = document.getElementById('ukrBlock');
-  const paymentMethodSelect = document.getElementById('paymentMethod');
 
   function openOrderModal(prefillModel) {
     if (prefillModel && modelSelect) modelSelect.value = prefillModel;
@@ -1039,164 +1038,6 @@
     });
   }
 
-  // ====== УКРПОШТА API + автокомпліт ======
-  const ukrCityInput = document.getElementById('ukrCity');
-  const ukrCityList = document.getElementById('ukrCityList');
-  const ukrCityHint = document.getElementById('ukrCityHint');
-  const ukrOfficeInput = document.getElementById('ukrOffice');
-  const ukrOfficeList = document.getElementById('ukrOfficeList');
-
-  let ukrCitySearchTimeout = null;
-  let ukrSelectedCityId = null;
-  let ukrOfficeOptions = [];
-
-  async function searchUkrCities(query) {
-    try {
-      const res = await fetch(`https://www.ukrposhta.ua/address-classifier-ws/get_city_by_region_id_and_district_id_and_city_ua?city_ua=${encodeURIComponent(query)}`);
-      const data = await res.json();
-      if (data.Entries && data.Entries.Entry) {
-        return Array.isArray(data.Entries.Entry) ? data.Entries.Entry : [data.Entries.Entry];
-      }
-      return [];
-    } catch (e) {
-      console.error(e);
-      return [];
-    }
-  }
-
-  async function loadUkrOffices(cityId) {
-    try {
-      const res = await fetch(`https://www.ukrposhta.ua/address-classifier-ws/get_postoffices_by_postcode_cityid_cityvpzid?city_id=${cityId}`);
-      const data = await res.json();
-      if (data.Entries && data.Entries.Entry) {
-        return Array.isArray(data.Entries.Entry) ? data.Entries.Entry : [data.Entries.Entry];
-      }
-      return [];
-    } catch (e) {
-      console.error(e);
-      return [];
-    }
-  }
-
-  function renderUkrCitySuggestions(list) {
-    ukrCityList.innerHTML = '';
-    if (!list.length) {
-      ukrCityList.innerHTML = '<div class="autocomplete-empty">Місто не знайдено</div>';
-      showList(ukrCityList);
-      return;
-    }
-    list.forEach(city => {
-      const item = document.createElement('div');
-      item.className = 'autocomplete-item';
-      item.textContent = city.CITY_UA;
-      item.dataset.id = city.CITY_ID;
-      item.addEventListener('click', async () => {
-        ukrCityInput.value = city.CITY_UA;
-        ukrSelectedCityId = city.CITY_ID;
-        hideList(ukrCityList);
-        ukrCityHint.textContent = 'Місто вибрано. Завантажуємо відділення...';
-
-        try {
-          ukrOfficeOptions = await loadUkrOffices(ukrSelectedCityId);
-          ukrOfficeInput.disabled = false;
-          ukrOfficeInput.value = '';
-          renderUkrOfficeSuggestions('');
-          ukrCityHint.textContent = 'Виберіть відділення або почніть його вводити.';
-        } catch (e) {
-          console.error(e);
-          ukrCityHint.textContent = 'Не вдалося завантажити відділення.';
-        }
-      });
-      ukrCityList.appendChild(item);
-    });
-    showList(ukrCityList);
-  }
-
-  function renderUkrOfficeSuggestions(filterText) {
-    ukrOfficeList.innerHTML = '';
-    if (!ukrOfficeOptions.length) {
-      ukrOfficeList.innerHTML = '<div class="autocomplete-empty">Спочатку оберіть місто</div>';
-      showList(ukrOfficeList);
-      return;
-    }
-    const q = filterText.toLowerCase();
-    const filtered = ukrOfficeOptions.filter(o => {
-      const postcode = o.POSTCODE || '';
-      const street = o.STREET_UA_VPZ || '';
-      const house = o.HOUSENUMBER_UA || '';
-      const fullText = `${postcode} ${street} ${house}`.toLowerCase();
-      return fullText.includes(q);
-    }).slice(0, 40);
-
-    if (!filtered.length) {
-      ukrOfficeList.innerHTML = '<div class="autocomplete-empty">Відділення не знайдено</div>';
-      showList(ukrOfficeList);
-      return;
-    }
-
-    filtered.forEach(o => {
-      const item = document.createElement('div');
-      item.className = 'autocomplete-item';
-      const postcode = o.POSTCODE || '';
-      const street = o.STREET_UA_VPZ || '';
-      const house = o.HOUSENUMBER_UA || '';
-      item.textContent = `${postcode} — ${street} ${house}`.trim();
-      item.addEventListener('click', () => {
-        ukrOfficeInput.value = `${postcode} — ${street} ${house}`.trim();
-        hideList(ukrOfficeList);
-      });
-      ukrOfficeList.appendChild(item);
-    });
-    showList(ukrOfficeList);
-  }
-
-  if (ukrCityInput) {
-    ukrCityInput.addEventListener('input', () => {
-      const q = ukrCityInput.value.trim();
-      ukrSelectedCityId = null;
-      ukrOfficeOptions = [];
-      if (ukrOfficeInput) {
-        ukrOfficeInput.value = '';
-        ukrOfficeInput.disabled = true;
-      }
-      hideList(ukrOfficeList);
-
-      if (q.length < 2) {
-        ukrCityHint.textContent = 'Введіть мінімум 2 літери.';
-        hideList(ukrCityList);
-        return;
-      }
-      ukrCityHint.textContent = 'Шукаємо міста...';
-
-      if (ukrCitySearchTimeout) clearTimeout(ukrCitySearchTimeout);
-      ukrCitySearchTimeout = setTimeout(async () => {
-        try {
-          const cities = await searchUkrCities(q);
-          renderUkrCitySuggestions(cities);
-          ukrCityHint.textContent = cities.length
-            ? 'Оберіть місто зі списку.'
-            : 'Місто не знайдено.';
-        } catch (err) {
-          console.error(err);
-          ukrCityHint.textContent = 'Не вдалося завантажити список міст.';
-        }
-      }, 400);
-    });
-  }
-
-  if (ukrOfficeInput) {
-    ukrOfficeInput.addEventListener('input', () => {
-      const q = ukrOfficeInput.value.trim();
-      renderUkrOfficeSuggestions(q);
-    });
-
-    ukrOfficeInput.addEventListener('focus', () => {
-      if (ukrOfficeOptions.length) {
-        renderUkrOfficeSuggestions(ukrOfficeInput.value.trim());
-      }
-    });
-  }
-
   // Закриття списків при кліку зовні
   document.addEventListener('click', e => {
     if (!npCityList.contains(e.target) && e.target !== npCityInput) {
@@ -1204,12 +1045,6 @@
     }
     if (!npWarehouseList.contains(e.target) && e.target !== npWarehouseInput) {
       hideList(npWarehouseList);
-    }
-    if (!ukrCityList.contains(e.target) && e.target !== ukrCityInput) {
-      hideList(ukrCityList);
-    }
-    if (!ukrOfficeList.contains(e.target) && e.target !== ukrOfficeInput) {
-      hideList(ukrOfficeList);
     }
   });
 
@@ -1228,7 +1063,7 @@
     }
 
     const deliveryMethod = deliveryMethodSelect.value;
-    const paymentMethod = paymentMethodSelect.value;
+    const paymentMethod = document.getElementById('paymentMethod').value;
 
     let deliveryCity = null;
     let deliveryWarehouseOrAddress = null;
@@ -1237,8 +1072,12 @@
       deliveryCity = npCityInput ? npCityInput.value.trim() || null : null;
       deliveryWarehouseOrAddress = npWarehouseInput ? npWarehouseInput.value.trim() || null : null;
     } else {
-      deliveryCity = ukrCityInput.value.trim() || null;
-      deliveryWarehouseOrAddress = ukrOfficeInput.value.trim() || null;
+      // Укрпошта: місто, індекс, адреса
+      const ukrCity = document.getElementById('ukrCity').value.trim();
+      const ukrIndex = document.getElementById('ukrIndex').value.trim();
+      const ukrAddress = document.getElementById('ukrAddress').value.trim();
+      deliveryCity = ukrCity || null;
+      deliveryWarehouseOrAddress = ukrIndex && ukrAddress ? `${ukrIndex}, ${ukrAddress}` : null;
     }
 
     const payload = {
@@ -1270,17 +1109,11 @@
       updateDeliveryBlocks();
 
       if (npCityHint) npCityHint.textContent = 'Введіть мінімум 2 літери.';
-      if (ukrCityHint) ukrCityHint.textContent = 'Введіть мінімум 2 літери.';
       npSelectedCityRef = null;
       npWarehouseOptions = [];
-      ukrSelectedCityId = null;
-      ukrOfficeOptions = [];
       if (npWarehouseInput) npWarehouseInput.disabled = true;
-      if (ukrOfficeInput) ukrOfficeInput.disabled = true;
       hideList(npCityList);
       hideList(npWarehouseList);
-      hideList(ukrCityList);
-      hideList(ukrOfficeList);
     } catch (err) {
       console.error(err);
       formStatus.textContent = 'Помилка при відправці. Спробуйте ще раз.';
