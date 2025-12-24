@@ -679,7 +679,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-header">
       <div class="modal-title" id="modalTitle">Залиште заявку</div>
-      <button class="modal-close" type="button" aria-label="Закрити" data-close-modal>&times;</button>
+      <button class="modal-close" type="button" aria-label="Закрити" data-close-modal>×</button>
     </div>
     <p class="modal-sub">
       Ми перетелефонуємо, уточнимо замовлення та оформимо доставку.
@@ -775,7 +775,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="detailsTitle">
     <div class="modal-header">
       <div class="modal-title" id="detailsTitle">Характеристики</div>
-      <button class="modal-close" type="button" aria-label="Закрити" data-close-details>&times;</button>
+      <button class="modal-close" type="button" aria-label="Закрити" data-close-details>×</button>
     </div>
     <div class="modal-scroll" id="detailsContent"></div>
   </div>
@@ -806,18 +806,11 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   const ukrBlock = document.getElementById('ukrBlock');
 
   // ====== GOOGLE ADS CONVERSION FUNCTION ======
-  function gtag_report_conversion(url) {
-    var callback = function () {
-      if (typeof(url) != 'undefined') {
-        window.location = url;
-      }
-    };
+  function gtag_report_conversion(transaction_id) {
     gtag('event', 'conversion', {
-        'send_to': 'AW-17711054529/HLS7CMHryNYbEMH9pP1B',
-        'transaction_id': '',
-        'event_callback': callback
+      'send_to': 'AW-17711054529/HLS7CMHryNYbEMH9pP1B',
+      'transaction_id': transaction_id
     });
-    return false;
   }
 
   function openOrderModal(prefillModel) {
@@ -875,9 +868,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     btn.addEventListener('click', () => {
       const m = btn.getAttribute('data-model');
       openOrderModal(m);
-      
-      // ✅ ВІДСТЕЖЕННЯ КЛІКУ НА КНОПКУ "ЗАМОВИТИ"
-      gtag_report_conversion();
     });
   });
   closeOrderBtns.forEach(btn => btn.addEventListener('click', closeOrderModal));
@@ -1084,7 +1074,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     }
   });
 
-  // ====== Відправка заявки (webhook) ======
+  // ====== Відправка заявки (webhook) + CONVERSION TRACKING ======
   leadForm.addEventListener('submit', async e => {
     e.preventDefault();
     formStatus.textContent = '';
@@ -1115,6 +1105,9 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       deliveryWarehouseOrAddress = ukrIndex && ukrAddress ? `${ukrIndex}, ${ukrAddress}` : null;
     }
 
+    // ✅ Генеруємо унікальний transaction_id
+    const transactionId = 'order_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
     const payload = {
       name,
       phone,
@@ -1125,6 +1118,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       paymentMethod,
       message: document.getElementById('message').value.trim() || null,
       page: window.location.href,
+      transactionId: transactionId,
       createdAt: new Date().toISOString()
     };
 
@@ -1138,6 +1132,9 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       });
       if (!res.ok) throw new Error('Network error');
 
+      // ✅ ВІДСТЕЖЕННЯ КОНВЕРСІЇ GOOGLE ADS (тільки після успішної відправки)
+      gtag_report_conversion(transactionId);
+
       // Відправка події в dataLayer для GTM
       window.dataLayer = window.dataLayer || [];
       window.dataLayer.push({
@@ -1145,7 +1142,8 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         'form_name': 'lead_form',
         'model': modelSelect.value || 'not_selected',
         'delivery_method': deliveryMethod,
-        'payment_method': paymentMethod
+        'payment_method': paymentMethod,
+        'transaction_id': transactionId
       });
 
       formStatus.textContent = 'Дякуємо! Ми скоро з вами звʼяжемося.';
